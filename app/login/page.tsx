@@ -1,61 +1,22 @@
-// app/login/page.tsx (VERSÃO SIMPLIFICADA PARA TESTE DE BUILD)
+// app/login/page.tsx (VERSÃO EXTREMAMENTE SIMPLES PARA TESTE FINAL)
 'use client';
 
-import type React from "react";
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-
-// Importa a PONTE CORRETA que já consertamos
-import { createClient } from "@/lib/supabaseClient"; 
-
-// Importa os componentes de UI (verifique se os caminhos estão corretos para SEU projeto)
+// Importamos APENAS o mínimo necessário para a UI
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-// REMOVEMOS a importação do dynamic e a criação do MotionDiv
+import { useState } from 'react'; // Só para os inputs funcionarem minimamente
 
 export default function LoginPage() {
+  // Deixamos o state só para os inputs não darem erro
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const supabase = createClient(); // Usa a ponte correta
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (authError) throw authError;
-
-      // Check subscription status (ADICIONE SUA LÓGICA DE VERIFICAÇÃO DE PROFILE AQUI SE NECESSÁRIO)
-      // Exemplo simplificado:
-      // const { data: profile } = await supabase.from('profiles').select('*').eq('id', authData.user.id).single();
-      // if (profile?.subscription_status !== 'active') { ... }
-
-      router.push("/"); // Redireciona para a home após login (ajuste se necessário)
-
-    } catch (error: unknown) {
-        setError("Falha no login. Verifique seu email e senha.");
-        console.error("Erro no login:", error instanceof Error ? error.message : error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // REMOVEMOS COMPLETAMENTE a função handleLogin e o useRouter
 
   return (
-    // A estrutura externa permanece, mas sem o MotionDiv
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      {/* O MotionDiv foi removido daqui */}
       <Card className="border-2 w-full max-w-md"> 
         <CardHeader className="space-y-1 text-center">
           <div className="text-6xl mb-4">⚽</div>
@@ -63,7 +24,8 @@ export default function LoginPage() {
           <CardDescription className="text-pretty">Entre para acessar sua conta</CardDescription> 
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          {/* O form agora não faz NADA ao ser enviado */}
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -73,7 +35,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+                // disabled={isLoading} // Removido isLoading
               />
             </div>
             <div className="space-y-2">
@@ -84,21 +46,17 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
+                // disabled={isLoading} // Removido isLoading
               />
             </div>
-            {error && (
-              <div className="p-3 text-sm text-destructive-foreground bg-destructive/10 border border-destructive/20 rounded-lg">
-                {error}
-              </div>
-            )}
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Acessando..." : "Acessar"}
+            {/* Removido o display de erro */}
+            <Button type="submit" className="w-full" /* disabled={isLoading} */ > 
+              {/* Removido isLoading */}
+              Acessar
             </Button>
           </form>
         </CardContent>
       </Card>
-      {/* O fechamento do MotionDiv foi removido daqui */}
     </div>
   );
 }
