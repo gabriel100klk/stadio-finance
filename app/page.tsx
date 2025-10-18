@@ -1,138 +1,119 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Navigation } from "@/components/navigation"
-import { MonthSelector } from "@/components/month-selector"
-import { ScoreCard } from "@/components/score-card"
-import { PerformanceChart } from "@/components/performance-chart"
-import { TopCategories } from "@/components/top-categories"
-import { getTransactions, getCategories } from "@/lib/storage"
-import { getMonthlyStats } from "@/lib/calculations"
+import type React from "react"
+
+import { createClient } from "@/lib/supabaseClient";
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { useRouter } from 'next/navigation'
+import { useState } from "react"
 import { motion } from "framer-motion"
-import { isLoggedIn } from "@/lib/auth-storage"
 
-export default function DashboardPage() {
+export default function LoginPage() {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const [month, setMonth] = useState(new Date().getMonth())
-  const [year, setYear] = useState(new Date().getFullYear())
-  const [stats, setStats] = useState({
-    totalIncome: 0,
-    totalExpenses: 0,
-    balance: 0,
-    fixedExpenses: 0,
-    variableExpenses: 0,
-    investments: 0,
-    topIncome: [],
-    topFixed: [],
-    topVariable: [],
-  })
 
-  useEffect(() => {
-    if (!isLoggedIn()) {
-      router.push("/welcome")
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const supabase = createClient()
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (authError) throw authError
+
+      // Check subscription status
+      if (authData.user) {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("subscription_status, has_completed_onboarding")
+          .eq("id", authData.user.id)
+          .single()
+
+        if (profileError) throw profileError
+
+        // Check if subscription is active
+        if (profile.subscription_status !== "active" && profile.subscription_status !== "trial") {
+          setError("Sua assinatura está inativa. Por favor, renove sua assinatura.")
+          await supabase.auth.signOut()
+          return
+        }
+
+        // Redirect based on onboarding status
+        if (!profile.has_completed_onboarding) {
+          router.push("/onboarding")
+        } else {
+          router.push("/")
+        }
+      }
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Erro ao fazer login")
+    } finally {
+      setIsLoading(false)
     }
-  }, [router])
-
-  useEffect(() => {
-    const transactions = getTransactions()
-    const categories = getCategories()
-    const monthlyStats = getMonthlyStats(transactions, categories, month, year)
-    setStats(monthlyStats)
-  }, [month, year])
-
-  const handleMonthChange = (newMonth: number, newYear: number) => {
-    setMonth(newMonth)
-    setYear(newYear)
-  }
-
-  if (!isLoggedIn()) {
-    return null
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-
-      <main className="container mx-auto px-4 md:px-6 py-6 md:py-8 space-y-6 md:space-y-8">
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <MonthSelector month={month} year={year} onChange={handleMonthChange} />
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          key={`${month}-${year}`}
-        >
-          <ScoreCard totalIncome={stats.totalIncome} totalExpenses={stats.totalExpenses} balance={stats.balance} />
-        </motion.div>
-
-        <div className="flex flex-col md:grid md:grid-cols-2 gap-6">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <PerformanceChart
-              fixedExpenses={stats.fixedExpenses}
-              variableExpenses={stats.variableExpenses}
-              investments={stats.investments}
-            />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="space-y-6"
-          >
-            <TopCategories title="Ataque" emoji="⚽" items={stats.topIncome} color="primary" />
-          </motion.div>
-        </div>
-
-        <div className="flex flex-col md:grid md:grid-cols-2 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-          >
-            <TopCategories title="Defesa" emoji="🛡️" items={stats.topFixed} color="destructive" />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
-          >
-            <TopCategories title="Meio-Campo" emoji="🎯" items={stats.topVariable} color="accent" />
-          </motion.div>
-        </div>
-
-        {stats.investments > 0 && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-            className="max-w-md"
-          >
-            <div className="p-6 rounded-xl border-2 border-accent/20 bg-accent/5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-balance">🏆 Camisa 10</h3>
-                  <p className="text-sm text-muted-foreground">Investimentos do mês</p>
-                </div>
-                <p className="text-2xl font-bold text-accent">
-                  {new Intl.NumberFormat("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                  }).format(stats.investments)}
-                </p>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md"
+      >
+        <Card className="border-2">
+          <CardHeader className="space-y-1 text-center">
+            <div className="text-6xl mb-4">⚽</div>
+            <CardTitle className="text-3xl font-bold text-balance">Estádio Finance</CardTitle>
+            <CardDescription className="text-pretty">Entre para acessar sua conta premium</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoading}
+                />
               </div>
-            </div>
-          </motion.div>
-        )}
-      </main>
+              <div className="space-y-2">
+                <Label htmlFor="password">Senha</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+              {error && (
+                <div className="p-3 text-sm text-destructive-foreground bg-destructive/10 border border-destructive/20 rounded-lg">
+                  {error}
+                </div>
+              )}
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Acessando..." : "Acessar"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   )
 }
